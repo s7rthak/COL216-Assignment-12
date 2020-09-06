@@ -1,6 +1,6 @@
 import random
 
-f = open("random.txt", "w")
+f = open("text6.txt", "w")
 f.write('16 <Cache size in bytes>\n')
 f.write('2 <Chache line/block size in bytes>\n')
 f.write('2 <Cache Associavity>\n')

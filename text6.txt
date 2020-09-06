@@ -1,0 +1,35 @@
+16 <Cache size in bytes>
+2 <Chache line/block size in bytes>
+2 <Cache Associavity>
+4 <T>
+#memory access requests
+7,W,7
+37,W,37
+1,R
+24,W,24
+24,R
+10,R
+38,R
+15,W,15
+34,R
+34,R
+34,R
+0,W,0
+27,W,27
+27,R
+18,R
+18,R
+28,R
+24,W,24
+24,R
+11,W,11
+11,W,11
+13,R
+12,R
+12,W,12
+24,W,24
+24,R
+36,W,36
+11,R
+15,W,15
+15,W,15
