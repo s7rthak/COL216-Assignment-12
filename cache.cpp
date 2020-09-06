@@ -103,7 +103,7 @@ void replace(CacheAssoc &myAssoc, CacheDir &myCache){
     }
 }
 
-void CAR_read(int check, int assoc_to_check, CacheDir &myCache){
+bool CAR_read(int check, int assoc_to_check, CacheDir &myCache){
     myCache.cur_inst++;
     CacheAssoc &cur_set = myCache.cache[assoc_to_check];
     int i1 = indexOf(cur_set.t1, check), i2 = indexOf(cur_set.t2, check);
@@ -115,6 +115,7 @@ void CAR_read(int check, int assoc_to_check, CacheDir &myCache){
             cur_set.t2[i2].last_access = myCache.cur_inst;
             cur_set.t2[i2].page_ref = 1;
         }
+        return true;
     }else{                              // cache miss      
         int j1 = indexOf(cur_set.b1, check), j2 = indexOf(cur_set.b2, check);
         if(cur_set.t1.size() + cur_set.t2.size() == cur_set.assoc_size){
@@ -133,20 +134,24 @@ void CAR_read(int check, int assoc_to_check, CacheDir &myCache){
             cur_set.t1_head = cur_set.t1_head % cur_set.t1.size();
         } else if(j1 >= 0){
             myCache.p = min(myCache.p + max(1, (int)(cur_set.b2.size()/(cur_set.b1.size() + eps))), cur_set.assoc_size);
-            cur_set.t2.insert(cur_set.t2.begin() + cur_set.t2_head++, CacheBlock(check));
+            cur_set.t2.insert(cur_set.t2.begin() + cur_set.t2_head++, cur_set.b1[j1]);
+            cur_set.b1.erase(cur_set.b1.begin() + j1);
             cur_set.t2[cur_set.t2_head-1].last_access = myCache.cur_inst;
             cur_set.t2_head = cur_set.t2_head % cur_set.t2.size();
         } else if(j2 >= 0){
             myCache.p = max(myCache.p - max(1, (int)(cur_set.b1.size()/(cur_set.b2.size() + eps))), 0);
-            cur_set.t2.insert(cur_set.t2.begin() + cur_set.t2_head++, CacheBlock(check));
+            cur_set.t2.insert(cur_set.t2.begin() + cur_set.t2_head++, cur_set.b2[j2]);
+            cur_set.b2.erase(cur_set.b2.begin() + j2);
             cur_set.t2[cur_set.t2_head-1].last_access = myCache.cur_inst;
             cur_set.t2_head = cur_set.t2_head % cur_set.t2.size();
         }
     }
+    return false;
 }
 
-void CAR_write(int check, int assoc_to_check, CacheDir &myCache, int what){
+bool CAR_write(int check, int assoc_to_check, CacheDir &myCache, int what){
     myCache.cur_inst++;
+    bool ch = false;
     CacheAssoc &cur_set = myCache.cache[assoc_to_check];
     int i1 = indexOf(cur_set.t1, check), i2 = indexOf(cur_set.t2, check);
     if(i1 >= 0 || i2 >= 0){             // cache hit
@@ -161,6 +166,7 @@ void CAR_write(int check, int assoc_to_check, CacheDir &myCache, int what){
             cur_set.t1[i1].dirty = 1;
             cur_set.t1[i1].data = what;
         }
+        return true;
     }else{                              // cache miss      
         int j1 = indexOf(cur_set.b1, check), j2 = indexOf(cur_set.b2, check);
         if(cur_set.t1.size() + cur_set.t2.size() == cur_set.assoc_size){
@@ -171,6 +177,8 @@ void CAR_write(int check, int assoc_to_check, CacheDir &myCache, int what){
             }else if(cur_set.t1.size() + cur_set.t2.size() + cur_set.b1.size() + cur_set.b2.size() == 2 * cur_set.assoc_size && j1 < 0 && j2 < 0){
                 cur_set.b2.erase(cur_set.b2.begin());
             }
+        }else{
+            ch = true;
         }
         if(j1 < 0 && j2 < 0){
             cur_set.t1.insert(cur_set.t1.begin() + cur_set.t1_head++, CacheBlock(check));
@@ -180,19 +188,45 @@ void CAR_write(int check, int assoc_to_check, CacheDir &myCache, int what){
             cur_set.t1_head = cur_set.t1_head % cur_set.t1.size();
         } else if(j1 >= 0){
             myCache.p = min(myCache.p + max(1, (int)(cur_set.b2.size()/(cur_set.b1.size() + eps))), cur_set.assoc_size);
-            cur_set.t2.insert(cur_set.t2.begin() + cur_set.t2_head++, CacheBlock(check));
+            cur_set.t2.insert(cur_set.t2.begin() + cur_set.t2_head++, cur_set.b1[j1]);
+            cur_set.b1.erase(cur_set.b1.begin() + j1);
             cur_set.t2[cur_set.t2_head-1].last_access = myCache.cur_inst;
             cur_set.t2[cur_set.t2_head-1].data = what;
             cur_set.t2[cur_set.t2_head-1].dirty = 1;
             cur_set.t2_head = cur_set.t2_head % cur_set.t2.size();
         } else if(j2 >= 0){
             myCache.p = max(myCache.p - max(1, (int)(cur_set.b1.size()/(cur_set.b2.size() + eps))), 0);
-            cur_set.t2.insert(cur_set.t2.begin() + cur_set.t2_head++, CacheBlock(check));
+            cur_set.t2.insert(cur_set.t2.begin() + cur_set.t2_head++, cur_set.b2[j2]);
+            cur_set.b2.erase(cur_set.b2.begin() + j2);
             cur_set.t2[cur_set.t2_head-1].last_access = myCache.cur_inst;
             cur_set.t2[cur_set.t2_head-1].data = what;
             cur_set.t2[cur_set.t2_head-1].dirty = 1;
             cur_set.t2_head = cur_set.t2_head % cur_set.t2.size();
         }
+    }
+    return ch;
+}
+
+void print(int index_size, int cache_assoc, CacheDir& myCache){
+    for(int i=0;i<index_size/cache_assoc;i++){
+        CacheAssoc &to_print = myCache.cache[i];
+        cout<<"--- T1 of Assoc-" + to_string(i) + " ---\n";
+        for(int j=0;j<to_print.t1.size();j++){
+            cout<<to_print.t1[j].index<<" "<<to_print.t1[j].data<<" "<<(int)to_print.t1[j].dirty<<"\n";
+        }
+        cout<<"--- T2 of Assoc-" + to_string(i) + " ---\n";
+        for(int j=0;j<to_print.t2.size();j++){
+            cout<<to_print.t2[j].index<<" "<<to_print.t2[j].data<<" "<<(int)to_print.t2[j].dirty<<"\n";
+        }
+        cout<<"--- B1 of Assoc-" + to_string(i) + " ---\n";
+        for(int j=0;j<to_print.b1.size();j++){
+            cout<<to_print.b1[j].index<<" "<<to_print.b1[j].data<<" "<<(int)to_print.b1[j].dirty<<"\n";
+        }
+        cout<<"--- B2 of Assoc-" + to_string(i) + " ---\n";
+        for(int j=0;j<to_print.b2.size();j++){
+            cout<<to_print.b2[j].index<<" "<<to_print.b2[j].data<<" "<<(int)to_print.b2[j].dirty<<"\n";
+        }
+        cout<<"\n";
     }
 }
 
@@ -206,36 +240,36 @@ int main(int argc, char *argv[]){
     int T = p[3];
     CacheDir myCache = CacheDir(cache_assoc, cache_size/block_size, block_size);
     int index_size = cache_size/block_size;
+    int read_hit = 0;
+    int read = 0;
+    int write_hit = 0;
+    int write = 0;
     for(int i=0;i<mem_acc.size();i++){
         int acc = stoi(mem_acc[i][0]);
         int to_check = (acc%index_size)/cache_assoc;
         if(mem_acc[i][1] == "R"){
-            CAR_read(acc,to_check,myCache);
+            if(CAR_read(acc,to_check,myCache)){
+                read_hit++;
+            }
+            read++;
         }else{
-            CAR_write(acc,to_check,myCache,stoi(mem_acc[i][2]));
+            if(CAR_write(acc,to_check,myCache,stoi(mem_acc[i][2]))){
+                write_hit++;
+            }
+            write++;
         }
     }
     // replace(myCache.cache[0], myCache);
     // cout<<myCache.cache[0].t1_head;
-    for(int i=0;i<index_size/cache_assoc;i++){
-        CacheAssoc &to_print = myCache.cache[i];
-        cout<<"--- T1 of Assoc-" + to_string(i) + " ---\n";
-        for(int j=0;j<to_print.t1.size();j++){
-            cout<<to_print.t1[j].index<<" "<<to_print.t1[j].data<<"\n";
-        }
-        cout<<"--- T2 of Assoc-" + to_string(i) + " ---\n";
-        for(int j=0;j<to_print.t2.size();j++){
-            cout<<to_print.t2[j].index<<" "<<to_print.t2[j].data<<"\n";
-        }
-        cout<<"--- B1 of Assoc-" + to_string(i) + " ---\n";
-        for(int j=0;j<to_print.b1.size();j++){
-            cout<<to_print.b1[j].index<<" "<<to_print.b1[j].data<<"\n";
-        }
-        cout<<"--- B2 of Assoc-" + to_string(i) + " ---\n";
-        for(int j=0;j<to_print.b2.size();j++){
-            cout<<to_print.b2[j].index<<" "<<to_print.b2[j].data<<"\n";
-        }
-        cout<<"\n";
-    }
+    print(index_size, cache_assoc, myCache);
+    cout<<"Cache Statistics:\n";
+    cout<<"Number of accesses = "<<read+write<<"\n";
+    cout<<"Number of reads = "<<read<<"\n";
+    cout<<"Number of read hits = "<<read_hit<<"\n";
+    cout<<"Number of read misses = "<<read-read_hit<<"\n";
+    cout<<"Number of writes = "<<write<<"\n";
+    cout<<"Number of write hits = "<<write_hit<<"\n";
+    cout<<"Number of write misses = "<<write-write_hit<<"\n";
+    cout<<"Pseudo-hit ratio = "<<(read_hit+write_hit)*1.0/(read+write)<<"\n\n";
     // cout<<myCache.p<<"\n";
 }
